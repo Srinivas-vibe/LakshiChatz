@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "LakshiChatz",
+    "slug": "lakshichatz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash.png",
+      "backgroundColor": "#0A051D",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lakshichatz.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6C63FF"
+      },
+      "package": "com.lakshichatz.app"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}
