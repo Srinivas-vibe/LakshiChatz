@@ -28,7 +28,7 @@ import LoadingSkeleton from '../../../components/LoadingSkeleton';
 import VaultSetupModal from '../../../components/VaultSetupModal';
 import useVaultStore from '../../../store/vaultStore';
 import { formatLastSeen } from '../../../utils';
-import { Lock } from 'lucide-react-native';
+import { Lock, Unlock } from 'lucide-react-native';
 
 /**
  * Chat room screen — the main messaging view.
@@ -249,17 +249,35 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const subtitleText = getSubtitle();
 
+  const isLocked = vaultStore.lockedChatIds.includes(userId);
+
   const handleLockChatPress = () => {
     if (!vaultStore.isConfigured) {
       setShowVaultSetup(true);
-    } else {
+    } else if (isLocked) {
       Alert.alert(
-        'Lock Chat',
-        'Lock this conversation? It will become hidden from your main chat list.',
+        'Unhide Chat',
+        'Remove this conversation from your Vault and return it to the main chat list?',
         [
           { text: 'Cancel', style: 'cancel' },
           { 
-            text: 'Lock', 
+            text: 'Unhide', 
+            style: 'default',
+            onPress: () => {
+              vaultStore.unlockChat(userId);
+              navigation.goBack();
+            }
+          }
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Hide Chat',
+        'Hide this conversation? It will become hidden from your main chat list.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Hide', 
             style: 'destructive',
             onPress: () => {
               vaultStore.lockChat(userId);
@@ -276,8 +294,6 @@ const ChatRoomScreen = ({ route, navigation }) => {
     vaultStore.lockChat(userId);
     navigation.goBack();
   };
-
-  const isLocked = vaultStore.lockedChatIds.includes(userId);
 
   return (
     <KeyboardAvoidingView
@@ -326,7 +342,11 @@ const ChatRoomScreen = ({ route, navigation }) => {
         }
         rightComponent={
           <TouchableOpacity onPress={handleLockChatPress} style={{ padding: 8 }}>
-            <Lock color={isLocked ? colors.primary : colors.textSecondary} size={22} />
+            {isLocked ? (
+              <Unlock color={colors.primary} size={22} />
+            ) : (
+              <Lock color={colors.textSecondary} size={22} />
+            )}
           </TouchableOpacity>
         }
       />
