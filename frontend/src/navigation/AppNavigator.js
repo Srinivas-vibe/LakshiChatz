@@ -18,6 +18,7 @@ import { View, StyleSheet } from 'react-native';
 const AppNavigator = () => {
   const { isAuthenticated, isLoading } = useAuthStore();
   const theme = useTheme();
+  const isLocked = useAppLockStore((s) => s.isLocked);
 
   // Initialize socket connection when authenticated
   useSocket();
@@ -25,8 +26,6 @@ const AppNavigator = () => {
   if (isLoading) {
     return <SplashScreen />;
   }
-
-  const isLocked = useAppLockStore((s) => s.isLocked);
 
   return (
     <View style={{ flex: 1 }}>

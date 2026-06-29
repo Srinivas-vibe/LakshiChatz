@@ -147,7 +147,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
       deleteMessageInStore(userId, selectedMessage._id, deleteType);
       
       // REST API call
-      await messageService.deleteMessage(selectedMessage._id, deleteType);
+      await messageService.deleteMessage(
+        selectedMessage._id,
+        deleteType,
+        userId,
+        selectedMessage.chatId || chatId
+      );
     } catch (error) {
       console.error('Failed to delete message:', error);
       Alert.alert('Error', error.message || 'Failed to delete message');
@@ -200,7 +205,12 @@ const ChatRoomScreen = ({ route, navigation }) => {
       setShowEditModal(false);
 
       // REST API call
-      await messageService.editMessage(msgId, newText);
+      await messageService.editMessage(
+        msgId,
+        newText,
+        userId,
+        selectedMessage.chatId || chatId
+      );
     } catch (error) {
       console.error('Failed to edit message:', error);
       Alert.alert('Error', error.message || 'Failed to edit message');
@@ -272,8 +282,8 @@ const ChatRoomScreen = ({ route, navigation }) => {
   return (
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header with user info */}
       <Header
@@ -347,7 +357,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
             }
           }}
           ListFooterComponent={
-            isTyping ? <TypingIndicator username={username} /> : null
+            isTyping ? <TypingIndicator username={displayName || username} /> : null
           }
         />
       )}
@@ -420,7 +430,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           onPress={() => setShowEditModal(false)}
         >
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             style={styles.dialogContainer}
           >
             <TouchableOpacity

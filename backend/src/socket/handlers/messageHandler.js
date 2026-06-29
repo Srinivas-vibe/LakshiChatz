@@ -82,13 +82,20 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
     try {
       const { chatId, senderId } = data;
 
-      // Mark messages as delivered
+      // Mark messages as delivered (if still in DB)
       await messageService.markAsDelivered(socket.userId, chatId);
 
-      // Notify the original sender
+      // Notify the original sender regardless of DB result
       const senderSocketId = connectedUsers.get(senderId);
       if (senderSocketId) {
         io.to(senderSocketId).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
+          chatId,
+          status: 'delivered',
+          deliveredAt: new Date(),
+        });
+      } else {
+        // Queue pending event if sender offline
+        await messageService.savePendingEvent(senderId, SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, null, {
           chatId,
           status: 'delivered',
           deliveredAt: new Date(),
@@ -109,20 +116,26 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
     try {
       const { chatId, senderId } = data;
 
-      // Mark all messages in this chat as read
-      const updatedMessages = await messageService.markAsRead(chatId, socket.userId);
+      // Mark all messages in this chat as read (if still in DB)
+      await messageService.markAsRead(chatId, socket.userId);
 
-      if (updatedMessages.length > 0) {
-        // Notify the sender that their messages have been read
-        const senderSocketId = connectedUsers.get(senderId);
-        if (senderSocketId) {
-          io.to(senderSocketId).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
-            chatId,
-            status: 'read',
-            readAt: new Date(),
-            readBy: socket.userId,
-          });
-        }
+      // Notify the sender that their messages have been read
+      const senderSocketId = connectedUsers.get(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
+          chatId,
+          status: 'read',
+          readAt: new Date(),
+          readBy: socket.userId,
+        });
+      } else {
+        // Queue pending event if sender offline
+        await messageService.savePendingEvent(senderId, SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, null, {
+          chatId,
+          status: 'read',
+          readAt: new Date(),
+          readBy: socket.userId,
+        });
       }
     } catch (error) {
       console.error('Socket seen error:', error.message);

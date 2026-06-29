@@ -38,9 +38,11 @@ const messageService = {
    * @param {string} message - The new message content.
    * @returns {Promise<Object>} Updated message.
    */
-  editMessage: async (messageId, message) => {
+  editMessage: async (messageId, message, receiverId, chatId) => {
     const response = await api.put(`/messages/edit/${messageId}`, {
       message,
+      receiverId,
+      chatId,
     });
     return response.data.data;
   },
@@ -51,9 +53,11 @@ const messageService = {
    * @param {string} deleteType - 'me' or 'everyone'.
    * @returns {Promise<Object>} Response.
    */
-  deleteMessage: async (messageId, deleteType) => {
+  deleteMessage: async (messageId, deleteType, receiverId, chatId) => {
     const response = await api.post(`/messages/delete/${messageId}`, {
       deleteType,
+      receiverId,
+      chatId,
     });
     return response.data.data;
   },

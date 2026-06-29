@@ -219,14 +219,24 @@ class MessageService {
    * @param {string} newText - New message content.
    * @returns {Promise<Object>} Updated message.
    */
-  async editMessage(messageId, userId, newText) {
+  async editMessage(messageId, userId, newText, receiverId, chatId) {
     const message = await Message.findById(messageId);
 
     if (!message) {
-      const error = new Error('Message not found');
-      error.statusCode = HTTP_STATUS.NOT_FOUND;
-      error.code = 'MESSAGE_NOT_FOUND';
-      throw error;
+      if (!receiverId || !chatId) {
+        const error = new Error('Message not found on server. receiverId and chatId are required for relay');
+        error.statusCode = HTTP_STATUS.BAD_REQUEST;
+        error.code = 'MESSAGE_NOT_FOUND_RELAY';
+        throw error;
+      }
+      return {
+        _id: messageId,
+        message: newText.trim(),
+        chatId: chatId,
+        sender: { _id: userId },
+        receiver: { _id: receiverId },
+        edited: true,
+      };
     }
 
     if (message.sender.toString() !== userId.toString()) {
@@ -273,14 +283,26 @@ class MessageService {
    * @param {string} deleteType - 'me' or 'everyone'.
    * @returns {Promise<Object>} Updated/deleted message.
    */
-  async deleteMessage(messageId, userId, deleteType) {
+  async deleteMessage(messageId, userId, deleteType, receiverId, chatId) {
     const message = await Message.findById(messageId);
 
     if (!message) {
-      const error = new Error('Message not found');
-      error.statusCode = HTTP_STATUS.NOT_FOUND;
-      error.code = 'MESSAGE_NOT_FOUND';
-      throw error;
+      if (deleteType === 'me') {
+        return { _id: messageId };
+      }
+      if (!receiverId || !chatId) {
+        const error = new Error('Message not found on server. receiverId and chatId are required for relay');
+        error.statusCode = HTTP_STATUS.BAD_REQUEST;
+        error.code = 'MESSAGE_NOT_FOUND_RELAY';
+        throw error;
+      }
+      return {
+        _id: messageId,
+        chatId: chatId,
+        sender: { _id: userId },
+        receiver: { _id: receiverId },
+        deleted: true,
+      };
     }
 
     if (deleteType === 'everyone') {

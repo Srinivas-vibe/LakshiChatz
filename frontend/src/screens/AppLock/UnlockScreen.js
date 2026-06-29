@@ -7,8 +7,8 @@ import Animated, {
   withTiming,
   withRepeat,
 } from 'react-native-reanimated';
-import { useTheme } from '../../../theme';
-import useAppLockStore from '../../../store/appLockStore';
+import { useTheme } from '../../theme';
+import useAppLockStore from '../../store/appLockStore';
 import { ShieldAlert, Fingerprint } from 'lucide-react-native';
 
 const { width } = Dimensions.get('window');

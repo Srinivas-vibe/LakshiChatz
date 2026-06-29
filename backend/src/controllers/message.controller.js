@@ -39,7 +39,7 @@ const getHistory = asyncHandler(async (req, res) => {
  */
 const editMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const { message } = req.body;
+  const { message, receiverId, chatId } = req.body;
 
   if (!message || !message.trim()) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -48,7 +48,7 @@ const editMessage = asyncHandler(async (req, res) => {
     });
   }
 
-  const updatedMessage = await messageService.editMessage(messageId, req.userId, message);
+  const updatedMessage = await messageService.editMessage(messageId, req.userId, message, receiverId, chatId);
 
   // Broadcast to participants via Socket.IO
   const io = req.app.get('io');
@@ -88,7 +88,7 @@ const editMessage = asyncHandler(async (req, res) => {
  */
 const deleteMessage = asyncHandler(async (req, res) => {
   const { messageId } = req.params;
-  const { deleteType } = req.body; // 'me' or 'everyone'
+  const { deleteType, receiverId, chatId } = req.body; // 'me' or 'everyone'
 
   if (!deleteType || !['me', 'everyone'].includes(deleteType)) {
     return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -97,7 +97,7 @@ const deleteMessage = asyncHandler(async (req, res) => {
     });
   }
 
-  const updatedMessage = await messageService.deleteMessage(messageId, req.userId, deleteType);
+  const updatedMessage = await messageService.deleteMessage(messageId, req.userId, deleteType, receiverId, chatId);
 
   // Broadcast to participants if deleted for everyone
   if (deleteType === 'everyone') {

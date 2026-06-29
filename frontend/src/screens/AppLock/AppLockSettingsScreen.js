@@ -8,9 +8,9 @@ import {
   Switch,
   Alert,
 } from 'react-native';
-import { useTheme } from '../../../theme';
-import useAppLockStore from '../../../store/appLockStore';
-import Header from '../../../components/Header';
+import { useTheme } from '../../theme';
+import useAppLockStore from '../../store/appLockStore';
+import Header from '../../components/Header';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { ChevronRight, ShieldCheck, Clock } from 'lucide-react-native';
 
