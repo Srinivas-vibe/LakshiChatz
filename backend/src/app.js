@@ -29,9 +29,6 @@ const createApp = () => {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-  // ─── Static Files (for future profile picture uploads) ─
-  app.use('/uploads', express.static('uploads'));
-
   // ─── API Routes ────────────────────────────────────
   app.use('/api', routes);
 

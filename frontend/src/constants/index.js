@@ -2,17 +2,14 @@
  * Application-wide constants.
  */
 
-// API Configuration
-export const API_BASE_URL = 'http://192.168.1.117:5000/api'; // Point to machine's local IP
-export const SOCKET_URL = 'http://192.168.1.117:5000';
+// API Configuration - Live Production on Render
+export const API_BASE_URL = 'https://lakshichatz-1.onrender.com/api';
+export const SOCKET_URL = 'https://lakshichatz-1.onrender.com';
 
-// For iOS Simulator, use:
-// export const API_BASE_URL = 'http://localhost:5000/api';
-// export const SOCKET_URL = 'http://localhost:5000';
+// For Local Development, uncomment these and set to your local machine IP or localhost:
+// export const API_BASE_URL = 'http://192.168.1.117:5000/api';
+// export const SOCKET_URL = 'http://192.168.1.117:5000';
 
-// For physical device, use your machine's IP:
-// export const API_BASE_URL = 'http://192.168.x.x:5000/api';
-// export const SOCKET_URL = 'http://192.168.x.x:5000';
 
 // AsyncStorage Keys
 export const STORAGE_KEYS = {
@@ -20,6 +17,7 @@ export const STORAGE_KEYS = {
   USER_DATA: '@lakshichatz_user_data',
   THEME_PREFERENCE: '@lakshichatz_theme',
   CACHED_CHATS: '@lakshichatz_cached_chats',
+  SQLITE_DB_NAME: 'lakshichatz.db',
 };
 
 // Message Status
@@ -76,4 +74,8 @@ export const SCREENS = {
   SEARCH: 'Search',
   PROFILE: 'Profile',
   EDIT_PROFILE: 'EditProfile',
+  VAULT: 'Vault',
+  VAULT_SETTINGS: 'VaultSettings',
+  APP_LOCK_SETTINGS: 'AppLockSettings',
+  PIN_SETUP: 'PinSetup',
 };

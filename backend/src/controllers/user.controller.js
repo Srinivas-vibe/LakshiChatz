@@ -60,9 +60,8 @@ const uploadProfilePicture = asyncHandler(async (req, res) => {
     });
   }
 
-  // Generate full file URL
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
-  const fileUrl = `${baseUrl}/uploads/${req.file.filename}`;
+  // CloudinaryStorage automatically puts the remote URL in req.file.path
+  const fileUrl = req.file.path;
 
   // Update profilePicture field directly in the DB
   const user = await userService.updateProfile(req.userId, {

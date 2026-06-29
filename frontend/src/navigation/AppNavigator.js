@@ -7,6 +7,9 @@ import SplashScreen from '../screens/Splash/SplashScreen';
 import { getNavigationTheme } from './navigationTheme';
 import { useTheme } from '../theme';
 import useSocket from '../hooks/useSocket';
+import useAppLockStore from '../store/appLockStore';
+import UnlockScreen from '../screens/AppLock/UnlockScreen';
+import { View, StyleSheet } from 'react-native';
 
 /**
  * Root navigator.
@@ -23,10 +26,20 @@ const AppNavigator = () => {
     return <SplashScreen />;
   }
 
+  const isLocked = useAppLockStore((s) => s.isLocked);
+
   return (
-    <NavigationContainer theme={getNavigationTheme(theme.isDark, theme.colors)}>
-      {isAuthenticated ? <MainStack /> : <AuthStack />}
-    </NavigationContainer>
+    <View style={{ flex: 1 }}>
+      <NavigationContainer theme={getNavigationTheme(theme.isDark, theme.colors)}>
+        {isAuthenticated ? <MainStack /> : <AuthStack />}
+      </NavigationContainer>
+      
+      {isAuthenticated && isLocked && (
+        <View style={StyleSheet.absoluteFill}>
+          <UnlockScreen />
+        </View>
+      )}
+    </View>
   );
 };
 

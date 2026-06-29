@@ -111,6 +111,18 @@ const initializeSocket = (httpServer) => {
 
         console.log(`📬 Delivered ${undeliveredMessages.length} pending messages to ${socket.username}`);
       }
+
+      // Deliver pending edit/delete events that were queued while user was offline
+      const pendingEvents = await messageService.getPendingEvents(socket.userId);
+      if (pendingEvents.length > 0) {
+        for (const event of pendingEvents) {
+          socket.emit(event.eventType, event.payload);
+        }
+
+        // Clear pending events after delivery
+        await messageService.clearPendingEvents(socket.userId);
+        console.log(`📬 Delivered ${pendingEvents.length} pending events to ${socket.username}`);
+      }
     } catch (error) {
       console.error('Reconnection recovery error:', error.message);
     }

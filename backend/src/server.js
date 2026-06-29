@@ -3,6 +3,7 @@ const createApp = require('./app');
 const connectDB = require('./config/db');
 const env = require('./config/env');
 const { initializeSocket } = require('./socket/socketManager');
+const { startMessageCleanup } = require('./jobs/messageCleanup');
 
 /**
  * Bootstrap the server:
@@ -10,7 +11,8 @@ const { initializeSocket } = require('./socket/socketManager');
  * 2. Create Express app
  * 3. Create HTTP server
  * 4. Initialize Socket.IO
- * 5. Start listening
+ * 5. Start message cleanup job
+ * 6. Start listening
  */
 const startServer = async () => {
   try {
@@ -24,15 +26,11 @@ const startServer = async () => {
     const server = http.createServer(app);
 
     // Initialize Socket.IO
-    initializeSocket(server);
+    const io = initializeSocket(server);
+    app.set('io', io);
 
-    // Create uploads directory if it doesn't exist
-    const fs = require('fs');
-    const path = require('path');
-    const uploadsDir = path.join(__dirname, '..', 'uploads');
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
+    // Start periodic message cleanup job (relay model DB maintenance)
+    startMessageCleanup();
 
     // Start listening
     server.listen(env.PORT, () => {

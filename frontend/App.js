@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { ThemeProvider } from './src/theme';
 import AppNavigator from './src/navigation/AppNavigator';
+import localDb from './src/database/localDb';
 
 /**
  * Root application component.
@@ -12,6 +13,13 @@ import AppNavigator from './src/navigation/AppNavigator';
  * - ThemeProvider (for light/dark mode)
  */
 const App = () => {
+  useEffect(() => {
+    // Initialize local SQLite database on app start
+    localDb.getDatabase().catch((error) => {
+      console.error('Failed to initialize local database:', error);
+    });
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

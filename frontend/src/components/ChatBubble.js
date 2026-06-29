@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../theme';
 import { formatMessageTime } from '../utils';
 import { MESSAGE_STATUS } from '../constants';
@@ -11,8 +11,9 @@ import { MESSAGE_STATUS } from '../constants';
  * @param {Object} props.message - Message object.
  * @param {boolean} props.isMine - Whether the message is from the current user.
  * @param {boolean} [props.showTimestamp=true] - Whether to show the timestamp.
+ * @param {Function} [props.onLongPress] - Callback for long press event.
  */
-const ChatBubble = ({ message, isMine, showTimestamp = true }) => {
+const ChatBubble = ({ message, isMine, showTimestamp = true, onLongPress }) => {
   const { colors, borderRadius: br } = useTheme();
 
   const renderStatusIcon = () => {
@@ -73,7 +74,11 @@ const ChatBubble = ({ message, isMine, showTimestamp = true }) => {
         isMine ? styles.bubbleRight : styles.bubbleLeft,
       ]}
     >
-      <View
+      <TouchableOpacity
+        onLongPress={() => onLongPress && onLongPress(message)}
+        delayLongPress={450}
+        activeOpacity={0.85}
+        disabled={message.deleted}
         style={[
           styles.bubble,
           {
@@ -124,7 +129,7 @@ const ChatBubble = ({ message, isMine, showTimestamp = true }) => {
           )}
           {renderStatusIcon()}
         </View>
-      </View>
+      </TouchableOpacity>
     </View>
   );
 };

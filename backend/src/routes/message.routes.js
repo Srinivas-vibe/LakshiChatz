@@ -21,4 +21,14 @@ router.get(
   messageController.getHistory,
 );
 
+router.put(
+  '/edit/:messageId',
+  messageController.editMessage,
+);
+
+router.post(
+  '/delete/:messageId',
+  messageController.deleteMessage,
+);
+
 module.exports = router;

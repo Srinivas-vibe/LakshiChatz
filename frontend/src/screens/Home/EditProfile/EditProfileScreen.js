@@ -30,6 +30,7 @@ const EditProfileScreen = ({ navigation }) => {
 
   const [displayName, setDisplayName] = useState(user?.displayName || '');
   const [bio, setBio] = useState(user?.bio || '');
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [fieldErrors, setFieldErrors] = useState({});
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -56,37 +57,12 @@ const EditProfileScreen = ({ navigation }) => {
       }
 
       const asset = result.assets[0];
-      const localUri = asset.uri;
-      const filename = localUri.split('/').pop() || 'photo.jpg';
-
-      // Infer mime type
-      const match = /\.(\w+)$/.exec(filename);
-      const type = match ? `image/${match[1]}` : 'image/jpeg';
-
-      const formData = new FormData();
-      formData.append('profilePicture', {
-        uri: Platform.OS === 'android' ? localUri : localUri.replace('file://', ''),
-        name: filename,
-        type: type,
-      });
-
-      setIsUploadingPhoto(true);
-      const updatedUser = await uploadProfilePicture(formData);
-      setIsUploadingPhoto(false);
-
-      if (updatedUser) {
-        // Update both user in parent profile page and Auth store
-        await updateUser({ ...user, ...updatedUser });
-        Alert.alert('Success', 'Profile photo updated successfully!');
-      } else {
-        Alert.alert('Error', 'Failed to upload profile picture.');
-      }
+      setSelectedPhoto(asset);
     } catch (error) {
-      setIsUploadingPhoto(false);
-      console.error('Image picker/upload error:', error);
+      console.error('Image picker error:', error);
       Alert.alert('Error', 'An unexpected error occurred during photo selection.');
     }
-  }, [user, uploadProfilePicture, updateUser]);
+  }, []);
 
   const handleSave = useCallback(async () => {
     const errors = {};
@@ -107,24 +83,66 @@ const EditProfileScreen = ({ navigation }) => {
 
     setFieldErrors({});
 
-    const updatedUser = await updateProfile({
-      displayName: displayName.trim(),
-      bio: bio.trim(),
-    });
+    try {
+      let photoUpdate = {};
 
-    if (updatedUser) {
-      // Update auth store with new user data
-      await updateUser({ ...user, ...updatedUser });
+      // 1. If photo was changed, upload it first
+      if (selectedPhoto) {
+        setIsUploadingPhoto(true);
+        const filename = selectedPhoto.uri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-      Alert.alert('Success', 'Profile updated successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+        const formData = new FormData();
+        formData.append('profilePicture', {
+          uri: Platform.OS === 'android' ? selectedPhoto.uri : selectedPhoto.uri.replace('file://', ''),
+          name: filename,
+          type: type,
+        });
+
+        const uploadResult = await uploadProfilePicture(formData);
+        setIsUploadingPhoto(false);
+
+        if (uploadResult) {
+          photoUpdate = uploadResult;
+        } else {
+          Alert.alert('Error', 'Failed to upload profile picture.');
+          return;
+        }
+      }
+
+      // 2. Save text updates (displayName, bio)
+      const updatedUser = await updateProfile({
+        displayName: displayName.trim(),
+        bio: bio.trim(),
+      });
+
+      if (updatedUser) {
+        // Merge updates and update auth store
+        const mergedUser = {
+          ...user,
+          ...photoUpdate,
+          ...updatedUser,
+        };
+        await updateUser(mergedUser);
+
+        Alert.alert('Success', 'Profile updated successfully', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
+      } else {
+        Alert.alert('Error', 'Failed to update profile.');
+      }
+    } catch (error) {
+      setIsUploadingPhoto(false);
+      console.error('Error saving profile changes:', error);
+      Alert.alert('Error', 'Failed to save profile changes.');
     }
-  }, [displayName, bio, updateProfile, updateUser, user, navigation]);
+  }, [displayName, bio, selectedPhoto, updateProfile, uploadProfilePicture, updateUser, user, navigation]);
 
   const hasChanges =
     displayName.trim() !== (user?.displayName || '') ||
-    bio.trim() !== (user?.bio || '');
+    bio.trim() !== (user?.bio || '') ||
+    selectedPhoto !== null;
 
   return (
     <KeyboardAvoidingView
@@ -145,7 +163,7 @@ const EditProfileScreen = ({ navigation }) => {
         {/* Avatar */}
         <View style={styles.avatarSection}>
           <Avatar
-            uri={user?.profilePicture}
+            uri={selectedPhoto ? selectedPhoto.uri : user?.profilePicture}
             name={displayName || user?.displayName}
             size={90}
           />
@@ -201,8 +219,8 @@ const EditProfileScreen = ({ navigation }) => {
           <Button
             title="Save Changes"
             onPress={handleSave}
-            loading={isUpdatingProfile}
-            disabled={!hasChanges || isUpdatingProfile}
+            loading={isUpdatingProfile || isUploadingPhoto}
+            disabled={!hasChanges || isUpdatingProfile || isUploadingPhoto}
           />
         </View>
       </ScrollView>

@@ -23,7 +23,9 @@
       "package": "com.lakshichatz.app"
     },
     "plugins": [
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite",
+      "expo-secure-store"
     ]
   }
 }

@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import chatService from '../services/chatService';
-import messageService from '../services/messageService';
+import messageDb from '../database/messageDb';
+import chatDb from '../database/chatDb';
+import userCacheDb from '../database/userCacheDb';
 
 /**
  * Chat store (Zustand).
- * Manages chat list, messages, and active chat state.
+ * LOCAL-FIRST architecture: reads from SQLite, writes to SQLite + server relay.
+ * The server only holds undelivered messages temporarily.
  */
 const useChatStore = create((set, get) => ({
   // State
@@ -18,13 +21,54 @@ const useChatStore = create((set, get) => ({
   error: null,
 
   /**
-   * Fetch the user's chat list from API.
+   * Fetch the user's chat list from LOCAL SQLite.
+   * Falls back to server API if local is empty (first launch / new device).
    */
   fetchChatList: async () => {
     set({ isLoadingChats: true, error: null });
 
     try {
-      const chats = await chatService.getChatList();
+      // Read from local SQLite first
+      let chats = await chatDb.getChatList();
+
+      if (chats.length === 0) {
+        // Fallback to server API (first launch or new device)
+        try {
+          const serverChats = await chatService.getChatList();
+          if (serverChats && serverChats.length > 0) {
+            // Cache server chats locally
+            for (const chat of serverChats) {
+              const partner = chat.participants?.find(
+                (p) => p._id !== undefined
+              );
+              if (partner) {
+                await chatDb.upsertChat(
+                  {
+                    id: partner._id,
+                    username: partner.username,
+                    displayName: partner.displayName,
+                    profilePicture: partner.profilePicture,
+                  },
+                  {
+                    text: chat.lastMessage?.text || '',
+                    senderId: chat.lastMessage?.sender?._id || '',
+                    time: chat.lastMessage?.timestamp || new Date().toISOString(),
+                  },
+                  0
+                );
+
+                // Cache partner user profile
+                await userCacheDb.cacheUser(partner);
+              }
+            }
+
+            chats = await chatDb.getChatList();
+          }
+        } catch (serverError) {
+          console.warn('Server chat list fetch failed (offline?):', serverError.message);
+        }
+      }
+
       set({ chatList: chats, isLoadingChats: false });
       return chats;
     } catch (error) {
@@ -37,7 +81,7 @@ const useChatStore = create((set, get) => ({
   },
 
   /**
-   * Fetch message history with a specific user.
+   * Fetch message history with a specific user from LOCAL SQLite.
    * @param {string} userId - The other user's ID.
    * @param {number} [page=1] - Page number.
    */
@@ -48,7 +92,8 @@ const useChatStore = create((set, get) => ({
     }
 
     try {
-      const result = await messageService.getHistory(userId, page);
+      // Read from local SQLite
+      const result = await messageDb.getMessages(userId, page);
       const currentMessages = get().messages[userId] || [];
 
       set({
@@ -90,37 +135,45 @@ const useChatStore = create((set, get) => ({
   },
 
   /**
-   * Add a new message to the store (from socket or local send).
+   * Add a new message to the store AND persist to local SQLite.
    * @param {string} userId - The other user's ID (chat partner).
    * @param {Object} message - The message object.
    */
-  addMessage: (userId, message) => {
+  addMessage: async (userId, message) => {
     const currentMessages = get().messages[userId] || [];
 
     // Avoid duplicates
-    const exists = currentMessages.some(
-      (m) => m._id === message._id,
-    );
+    const msgId = message._id;
+    const exists = currentMessages.some((m) => m._id === msgId);
     if (exists) {
       return;
     }
 
+    // Update Zustand state
     set({
       messages: {
         ...get().messages,
         [userId]: [...currentMessages, message],
       },
     });
+
+    // Persist to local SQLite
+    try {
+      await messageDb.saveMessage(message, userId);
+    } catch (error) {
+      console.error('Failed to save message to local DB:', error.message);
+    }
   },
 
   /**
    * Update message status (sent → delivered → read).
+   * Also updates the local SQLite database.
    * @param {string} userId - The chat partner's ID.
    * @param {string} chatId - The chat ID.
    * @param {string} newStatus - The new status.
    * @param {Object} [extra] - Extra fields (deliveredAt, readAt).
    */
-  updateMessageStatus: (userId, chatId, newStatus, extra = {}) => {
+  updateMessageStatus: async (userId, chatId, newStatus, extra = {}) => {
     const currentMessages = get().messages[userId] || [];
 
     const updatedMessages = currentMessages.map((msg) => {
@@ -141,16 +194,24 @@ const useChatStore = create((set, get) => ({
         [userId]: updatedMessages,
       },
     });
+
+    // Update local SQLite
+    try {
+      await messageDb.updateMessageStatus(userId, newStatus, extra);
+    } catch (error) {
+      console.error('Failed to update message status in local DB:', error.message);
+    }
   },
 
   /**
    * Update the chat list when a new message is sent/received.
    * Moves the chat to the top and updates the last message.
+   * Also persists to local SQLite.
    * @param {string} userId - The chat partner's ID.
    * @param {Object} lastMessage - The last message info.
    * @param {number} [unreadIncrement=0] - How much to increment unread count.
    */
-  updateChatListItem: (userId, lastMessage, unreadIncrement = 0) => {
+  updateChatListItem: async (userId, lastMessage, unreadIncrement = 0) => {
     const currentChats = get().chatList;
     const chatIndex = currentChats.findIndex((chat) =>
       chat.participants.some((p) => p._id === userId),
@@ -181,8 +242,24 @@ const useChatStore = create((set, get) => ({
 
       set({ chatList: newChats });
     } else {
-      // Chat doesn't exist in list yet — refresh
+      // Chat doesn't exist in list yet — refresh from local DB
       get().fetchChatList();
+    }
+
+    // Update local SQLite chat list
+    try {
+      const senderId = lastMessage.sender?._id || lastMessage.sender || '';
+      await chatDb.updateLastMessage(
+        userId,
+        lastMessage.text || lastMessage.message || '',
+        senderId,
+        lastMessage.sentAt || new Date().toISOString()
+      );
+      if (unreadIncrement > 0) {
+        await chatDb.incrementUnread(userId, unreadIncrement);
+      }
+    } catch (error) {
+      console.error('Failed to update chat list in local DB:', error.message);
     }
   },
 
@@ -190,7 +267,7 @@ const useChatStore = create((set, get) => ({
    * Mark a chat as read (reset unread count).
    * @param {string} userId - The chat partner's user ID.
    */
-  markChatRead: (userId) => {
+  markChatRead: async (userId) => {
     const currentChats = get().chatList.map((chat) => {
       const isMatch = chat.participants.some((p) => p._id === userId);
       if (isMatch) {
@@ -206,6 +283,13 @@ const useChatStore = create((set, get) => ({
     });
 
     set({ chatList: currentChats });
+
+    // Update local SQLite
+    try {
+      await chatDb.markChatRead(userId);
+    } catch (error) {
+      console.error('Failed to mark chat read in local DB:', error.message);
+    }
   },
 
   /**
@@ -220,7 +304,115 @@ const useChatStore = create((set, get) => ({
   clearError: () => set({ error: null }),
 
   /**
-   * Reset the entire chat store (on logout).
+   * Edit a message in the local store AND local SQLite.
+   * @param {string} userId - The chat partner's user ID.
+   * @param {string} messageId - The message ID.
+   * @param {string} newText - The new message text.
+   */
+  editMessageInStore: async (userId, messageId, newText) => {
+    const chatMessages = get().messages[userId] || [];
+    const updatedMessages = chatMessages.map((msg) => {
+      if (msg._id === messageId) {
+        return { ...msg, message: newText, edited: true };
+      }
+      return msg;
+    });
+
+    set({
+      messages: {
+        ...get().messages,
+        [userId]: updatedMessages,
+      },
+    });
+
+    // Update lastMessage preview if this was the last message in the chat list
+    const lastMsg = updatedMessages[updatedMessages.length - 1];
+    if (lastMsg && lastMsg._id === messageId) {
+      get().updateChatListItem(userId, {
+        text: newText,
+        sender: lastMsg.sender,
+        sentAt: lastMsg.sentAt,
+      });
+    }
+
+    // Persist to local SQLite
+    try {
+      await messageDb.editMessage(messageId, newText);
+    } catch (error) {
+      console.error('Failed to edit message in local DB:', error.message);
+    }
+  },
+
+  /**
+   * Delete a message in the local store AND local SQLite.
+   * @param {string} userId - The chat partner's user ID.
+   * @param {string} messageId - The message ID.
+   * @param {string} deleteType - 'me' or 'everyone'.
+   */
+  deleteMessageInStore: async (userId, messageId, deleteType) => {
+    const chatMessages = get().messages[userId] || [];
+    let updatedMessages = [];
+
+    if (deleteType === 'everyone') {
+      updatedMessages = chatMessages.map((msg) => {
+        if (msg._id === messageId) {
+          return { ...msg, message: '🚫 This message was deleted', deleted: true };
+        }
+        return msg;
+      });
+    } else {
+      // 'me' - remove entirely
+      updatedMessages = chatMessages.filter((msg) => msg._id !== messageId);
+    }
+
+    set({
+      messages: {
+        ...get().messages,
+        [userId]: updatedMessages,
+      },
+    });
+
+    // Update lastMessage preview if this was the last message
+    const lastMsg = updatedMessages[updatedMessages.length - 1];
+    if (lastMsg) {
+      get().updateChatListItem(userId, {
+        text: lastMsg.deleted ? '🚫 This message was deleted' : lastMsg.message,
+        sender: lastMsg.sender,
+        sentAt: lastMsg.sentAt,
+      });
+    } else {
+      // No messages left, refresh chat list
+      get().fetchChatList();
+    }
+
+    // Persist to local SQLite
+    try {
+      if (deleteType === 'everyone') {
+        await messageDb.deleteMessageForEveryone(messageId);
+      } else {
+        await messageDb.deleteMessageForMe(messageId);
+      }
+    } catch (error) {
+      console.error('Failed to delete message in local DB:', error.message);
+    }
+  },
+
+  /**
+   * Ensure a chat exists in the local DB for a partner.
+   * Called when we receive a message from a new conversation.
+   * @param {Object} partnerInfo - { id, username, displayName, profilePicture }
+   * @param {Object} [lastMessage] - Last message info.
+   */
+  ensureChatExists: async (partnerInfo, lastMessage = null) => {
+    try {
+      await chatDb.upsertChat(partnerInfo, lastMessage);
+    } catch (error) {
+      console.error('Failed to ensure chat exists:', error.message);
+    }
+  },
+
+  /**
+   * Reset the entire chat store AND clear local SQLite (on logout).
    */
   reset: () =>
     set({

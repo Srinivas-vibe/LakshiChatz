@@ -31,6 +31,32 @@ const messageService = {
     });
     return response.data.data;
   },
+
+  /**
+   * Edit a message.
+   * @param {string} messageId - The message ID.
+   * @param {string} message - The new message content.
+   * @returns {Promise<Object>} Updated message.
+   */
+  editMessage: async (messageId, message) => {
+    const response = await api.put(`/messages/edit/${messageId}`, {
+      message,
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Delete a message.
+   * @param {string} messageId - The message ID.
+   * @param {string} deleteType - 'me' or 'everyone'.
+   * @returns {Promise<Object>} Response.
+   */
+  deleteMessage: async (messageId, deleteType) => {
+    const response = await api.post(`/messages/delete/${messageId}`, {
+      deleteType,
+    });
+    return response.data.data;
+  },
 };
 
 export default messageService;

@@ -73,6 +73,14 @@ class SocketService {
       callbacks.onMessageStatusUpdate?.(data);
     });
 
+    this.socket.on('messageEdited', (data) => {
+      callbacks.onMessageEdited?.(data);
+    });
+
+    this.socket.on('messageDeleted', (data) => {
+      callbacks.onMessageDeleted?.(data);
+    });
+
     // Typing events
     this.socket.on(SOCKET_EVENTS.TYPING, (data) => {
       callbacks.onTyping?.(data);
@@ -175,6 +183,17 @@ class SocketService {
         chatId,
         senderId,
       });
+    }
+  }
+
+  /**
+   * Emit a generic socket event.
+   * @param {string} event - The event name.
+   * @param {Object} data - The event data.
+   */
+  emit(event, data) {
+    if (this.socket?.connected) {
+      this.socket.emit(event, data);
     }
   }
 

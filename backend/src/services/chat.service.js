@@ -31,7 +31,46 @@ class ChatService {
    */
   async getChatList(userId) {
     const chats = await Chat.getUserChats(userId);
-    return chats;
+    const Message = require('../models/Message');
+
+    // Convert to lean objects so we can edit the lastMessage property dynamically
+    const leanChats = chats.map((chat) => (chat.toObject ? chat.toObject() : chat));
+
+    for (const chat of leanChats) {
+      // Find the latest message in this chat that is not deleted for the current user
+      const latestMessage = await Message.findOne({
+        chatId: chat._id,
+        deletedForUsers: { $ne: userId },
+      })
+        .sort({ sentAt: -1 })
+        .populate('sender', 'username displayName')
+        .lean();
+
+      if (latestMessage) {
+        if (latestMessage.deleted) {
+          chat.lastMessage = {
+            text: '🚫 This message was deleted',
+            sender: latestMessage.sender,
+            timestamp: latestMessage.sentAt,
+          };
+        } else {
+          chat.lastMessage = {
+            text: latestMessage.message,
+            sender: latestMessage.sender,
+            timestamp: latestMessage.sentAt,
+          };
+        }
+      } else {
+        // No messages left in the chat (or they've all been deleted for this user)
+        chat.lastMessage = {
+          text: '',
+          sender: null,
+          timestamp: chat.updatedAt,
+        };
+      }
+    }
+
+    return leanChats;
   }
 
   /**

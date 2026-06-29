@@ -16,7 +16,8 @@ import Header from '../../../components/Header';
 import Avatar from '../../../components/Avatar';
 import { SCREENS } from '../../../constants';
 import { formatJoinedDate } from '../../../utils';
-import { Calendar, Edit3, LogOut, ChevronRight } from 'lucide-react-native';
+import { Calendar, Edit3, LogOut, ChevronRight, Shield, LockKeyhole } from 'lucide-react-native';
+import useVaultStore from '../../../store/vaultStore';
 
 /**
  * Profile screen displaying current user's information.
@@ -27,6 +28,7 @@ const ProfileScreen = ({ navigation }) => {
   const resetChat = useChatStore((s) => s.reset);
   const resetSocket = useSocketStore((s) => s.reset);
   const resetUser = useUserStore((s) => s.reset);
+  const vaultStore = useVaultStore();
 
   const handleLogout = () => {
     Alert.alert(
@@ -141,6 +143,40 @@ const ProfileScreen = ({ navigation }) => {
             </Text>
             <ChevronRight size={20} color={colors.textTertiary} />
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              { backgroundColor: colors.card, borderColor: colors.borderLight, ...shadows.sm },
+            ]}
+            onPress={() => navigation.navigate(SCREENS.APP_LOCK_SETTINGS)}
+            activeOpacity={0.7}
+          >
+            <LockKeyhole size={20} color={colors.primary} style={styles.actionIcon} />
+            <Text style={[styles.actionText, { color: colors.text }]}>App Lock</Text>
+            <ChevronRight size={20} color={colors.textTertiary} />
+          </TouchableOpacity>
+
+          {vaultStore.isConfigured && (
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.borderLight,
+                  ...shadows.sm,
+                },
+              ]}
+              onPress={() => navigation.navigate(SCREENS.VAULT_SETTINGS)}
+              activeOpacity={0.7}
+            >
+              <Shield size={20} color={colors.primary} style={styles.actionIcon} />
+              <Text style={[styles.actionText, { color: colors.text }]}>
+                Private Vault
+              </Text>
+              <ChevronRight size={20} color={colors.textTertiary} />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             style={[

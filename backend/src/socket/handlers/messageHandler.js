@@ -128,6 +128,25 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
       console.error('Socket seen error:', error.message);
     }
   });
+
+  /**
+   * Handle message received ACK.
+   * Client emits this after saving the message to local SQLite.
+   * Server then deletes the message from MongoDB (relay model).
+   *
+   * Payload: { messageId }
+   */
+  socket.on('messageReceived', async (data) => {
+    try {
+      const { messageId } = data;
+      if (!messageId) return;
+
+      // Delete the message from MongoDB since client has saved it locally
+      await messageService.deleteDeliveredMessage(messageId);
+    } catch (error) {
+      console.error('Socket messageReceived ACK error:', error.message);
+    }
+  });
 };
 
 module.exports = registerMessageHandlers;

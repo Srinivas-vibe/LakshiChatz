@@ -84,6 +84,14 @@ const useSocketStore = create((set, get) => ({
         handlers.onMessageStatusUpdate?.(data);
       },
 
+      onMessageEdited: (data) => {
+        handlers.onMessageEdited?.(data);
+      },
+
+      onMessageDeleted: (data) => {
+        handlers.onMessageDeleted?.(data);
+      },
+
       onError: (error) => {
         console.error('Socket store error:', error);
       },

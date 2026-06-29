@@ -81,7 +81,7 @@ class MessageService {
     const [messages, total] = await Promise.all([
       Message.find({
         chatId: chat._id,
-        deleted: false,
+        deletedForUsers: { $ne: currentUserId },
       })
         .sort({ sentAt: -1 })
         .skip(skip)
@@ -91,7 +91,7 @@ class MessageService {
         .lean(),
       Message.countDocuments({
         chatId: chat._id,
-        deleted: false,
+        deletedForUsers: { $ne: currentUserId },
       }),
     ]);
 
@@ -208,6 +208,187 @@ class MessageService {
       .lean();
 
     return messages;
+  }
+
+  /**
+   * Edit a message's content.
+   * Only the sender can edit, and only within 30 minutes.
+   *
+   * @param {string} messageId - Message ObjectId.
+   * @param {string} userId - Requesting user's ObjectId.
+   * @param {string} newText - New message content.
+   * @returns {Promise<Object>} Updated message.
+   */
+  async editMessage(messageId, userId, newText) {
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      const error = new Error('Message not found');
+      error.statusCode = HTTP_STATUS.NOT_FOUND;
+      error.code = 'MESSAGE_NOT_FOUND';
+      throw error;
+    }
+
+    if (message.sender.toString() !== userId.toString()) {
+      const error = new Error('Unauthorized to edit this message');
+      error.statusCode = HTTP_STATUS.FORBIDDEN;
+      error.code = 'UNAUTHORIZED';
+      throw error;
+    }
+
+    if (message.deleted) {
+      const error = new Error('Cannot edit a deleted message');
+      error.statusCode = HTTP_STATUS.BAD_REQUEST;
+      error.code = 'ALREADY_DELETED';
+      throw error;
+    }
+
+    // 30 minutes validation
+    const timeElapsedMs = Date.now() - new Date(message.sentAt).getTime();
+    const limitMs = 30 * 60 * 1000;
+    if (timeElapsedMs > limitMs) {
+      const error = new Error('Message can only be edited within 30 minutes of sending');
+      error.statusCode = HTTP_STATUS.BAD_REQUEST;
+      error.code = 'EDIT_TIMEOUT';
+      throw error;
+    }
+
+    message.message = newText.trim();
+    message.edited = true;
+    await message.save();
+
+    await message.populate('sender', 'username displayName profilePicture');
+    await message.populate('receiver', 'username displayName profilePicture');
+
+    return message;
+  }
+
+  /**
+   * Delete a message.
+   * Supports 'me' (delete for current user) and 'everyone' (delete for both).
+   * Only sender can delete for everyone.
+   *
+   * @param {string} messageId - Message ObjectId.
+   * @param {string} userId - Requesting user's ObjectId.
+   * @param {string} deleteType - 'me' or 'everyone'.
+   * @returns {Promise<Object>} Updated/deleted message.
+   */
+  async deleteMessage(messageId, userId, deleteType) {
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      const error = new Error('Message not found');
+      error.statusCode = HTTP_STATUS.NOT_FOUND;
+      error.code = 'MESSAGE_NOT_FOUND';
+      throw error;
+    }
+
+    if (deleteType === 'everyone') {
+      if (message.sender.toString() !== userId.toString()) {
+        const error = new Error('Only the sender can delete this message for everyone');
+        error.statusCode = HTTP_STATUS.FORBIDDEN;
+        error.code = 'UNAUTHORIZED';
+        throw error;
+      }
+
+      message.message = 'This message was deleted';
+      message.deleted = true;
+      await message.save();
+    } else if (deleteType === 'me') {
+      // Add user to deletedForUsers array if not already present
+      if (!message.deletedForUsers.includes(userId)) {
+        message.deletedForUsers.push(userId);
+        await message.save();
+      }
+    } else {
+      const error = new Error('Invalid delete type');
+      error.statusCode = HTTP_STATUS.BAD_REQUEST;
+      error.code = 'INVALID_DELETE_TYPE';
+      throw error;
+    }
+
+    await message.populate('sender', 'username displayName profilePicture');
+    await message.populate('receiver', 'username displayName profilePicture');
+
+    return message;
+  }
+
+  /**
+   * Delete a delivered message from MongoDB (called after client ACK).
+   * This is the core of the relay model — once the client has saved
+   * the message locally, we don't need it in the DB anymore.
+   *
+   * @param {string} messageId - Message ObjectId.
+   */
+  async deleteDeliveredMessage(messageId) {
+    await Message.findByIdAndDelete(messageId);
+  }
+
+  /**
+   * Bulk delete messages that have been delivered/read and are older than the threshold.
+   * Safety net cleanup for any messages that weren't ACK'd individually.
+   *
+   * @param {number} [maxAgeHours=24] - Delete delivered messages older than this.
+   */
+  async cleanupOldMessages(maxAgeHours = 24) {
+    const cutoffDate = new Date(Date.now() - maxAgeHours * 60 * 60 * 1000);
+
+    // Delete delivered/read messages older than threshold
+    const deliveredResult = await Message.deleteMany({
+      status: { $in: [MESSAGE_STATUS.DELIVERED, MESSAGE_STATUS.READ] },
+      sentAt: { $lt: cutoffDate },
+    });
+
+    // Delete all messages older than 30 days regardless of status (hard limit)
+    const hardCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const oldResult = await Message.deleteMany({
+      sentAt: { $lt: hardCutoff },
+    });
+
+    const totalDeleted = (deliveredResult.deletedCount || 0) + (oldResult.deletedCount || 0);
+    if (totalDeleted > 0) {
+      console.log(`🧹 Cleaned up ${totalDeleted} old messages from MongoDB`);
+    }
+
+    return totalDeleted;
+  }
+
+  /**
+   * Save a pending event for an offline user.
+   * When the user reconnects, these events will be delivered.
+   *
+   * @param {string} targetUserId - The offline user's ID.
+   * @param {string} eventType - 'messageEdited' or 'messageDeleted'.
+   * @param {string} messageId - The message's server ID.
+   * @param {Object} payload - Event payload data.
+   */
+  async savePendingEvent(targetUserId, eventType, messageId, payload) {
+    const PendingEvent = require('../models/PendingEvent');
+    await PendingEvent.create({
+      targetUserId,
+      eventType,
+      messageId,
+      payload,
+    });
+  }
+
+  /**
+   * Get all pending events for a user (on reconnection).
+   * @param {string} userId - The user's ObjectId.
+   * @returns {Promise<Object[]>} Array of pending events.
+   */
+  async getPendingEvents(userId) {
+    const PendingEvent = require('../models/PendingEvent');
+    return PendingEvent.find({ targetUserId: userId }).sort({ createdAt: 1 }).lean();
+  }
+
+  /**
+   * Clear all pending events for a user (after delivery).
+   * @param {string} userId - The user's ObjectId.
+   */
+  async clearPendingEvents(userId) {
+    const PendingEvent = require('../models/PendingEvent');
+    await PendingEvent.deleteMany({ targetUserId: userId });
   }
 }
 
