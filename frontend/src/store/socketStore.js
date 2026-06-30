@@ -93,7 +93,7 @@ const useSocketStore = create((set, get) => ({
       },
 
       onError: (error) => {
-        console.error('Socket store error:', error);
+        console.warn('Socket store error:', error);
       },
     });
   },

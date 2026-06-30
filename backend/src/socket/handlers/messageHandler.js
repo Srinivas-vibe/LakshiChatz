@@ -59,6 +59,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
         socket.emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
           messageId: result.message._id,
           chatId: result.chat._id,
+          userId: receiverId,
           status: 'delivered',
           deliveredAt: new Date(),
         });
@@ -90,6 +91,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
       if (senderSocketId) {
         io.to(senderSocketId).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
           chatId,
+          userId: socket.userId,
           status: 'delivered',
           deliveredAt: new Date(),
         });
@@ -97,6 +99,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
         // Queue pending event if sender offline
         await messageService.savePendingEvent(senderId, SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, null, {
           chatId,
+          userId: socket.userId,
           status: 'delivered',
           deliveredAt: new Date(),
         });
@@ -124,6 +127,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
       if (senderSocketId) {
         io.to(senderSocketId).emit(SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, {
           chatId,
+          userId: socket.userId,
           status: 'read',
           readAt: new Date(),
           readBy: socket.userId,
@@ -132,6 +136,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
         // Queue pending event if sender offline
         await messageService.savePendingEvent(senderId, SOCKET_EVENTS.MESSAGE_STATUS_UPDATE, null, {
           chatId,
+          userId: socket.userId,
           status: 'read',
           readAt: new Date(),
           readBy: socket.userId,

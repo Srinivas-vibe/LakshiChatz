@@ -5,10 +5,11 @@ import {
   TouchableOpacity,
   Text,
   StyleSheet,
+  Keyboard,
 } from 'react-native';
 import { useTheme } from '../theme';
-
-import { Smile, SendHorizontal } from 'lucide-react-native';
+import EmojiPicker from 'rn-emoji-keyboard';
+import { Smile, SendHorizontal, Keyboard as KeyboardIcon } from 'lucide-react-native';
 
 /**
  * Message input bar for chat room.
@@ -20,11 +21,25 @@ import { Smile, SendHorizontal } from 'lucide-react-native';
  * @param {Function} [props.onStopTyping] - Stop typing handler.
  */
 const MessageInput = ({ onSend, onTyping, onStopTyping }) => {
-  const { colors, borderRadius: br } = useTheme();
+  const { colors, borderRadius: br, isDark } = useTheme();
   const [message, setMessage] = useState('');
   const [inputHeight, setInputHeight] = useState(44);
+  const [isEmojiPickerOpen, setIsEmojiPickerOpen] = useState(false);
   const typingTimeoutRef = useRef(null);
   const inputRef = useRef(null);
+
+  const handleEmojiSelected = useCallback((emojiObject) => {
+    setMessage((prev) => {
+      const newText = prev + emojiObject.emoji;
+      // Trigger typing indicator
+      if (newText.length > 0) {
+        onTyping?.();
+        if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+        typingTimeoutRef.current = setTimeout(() => onStopTyping?.(), 2000);
+      }
+      return newText;
+    });
+  }, [onTyping, onStopTyping]);
 
   const handleChangeText = useCallback(
     (text) => {
@@ -88,9 +103,24 @@ const MessageInput = ({ onSend, onTyping, onStopTyping }) => {
         },
       ]}
     >
-      {/* Emoji button placeholder (future ready) */}
-      <TouchableOpacity style={styles.emojiButton} activeOpacity={0.6}>
-        <Smile size={24} color={colors.textSecondary} />
+      <TouchableOpacity
+        style={styles.emojiButton}
+        activeOpacity={0.6}
+        onPress={() => {
+          if (isEmojiPickerOpen) {
+            setIsEmojiPickerOpen(false);
+            inputRef.current?.focus();
+          } else {
+            Keyboard.dismiss();
+            setIsEmojiPickerOpen(true);
+          }
+        }}
+      >
+        {isEmojiPickerOpen ? (
+          <KeyboardIcon size={24} color={colors.primary} />
+        ) : (
+          <Smile size={24} color={colors.textSecondary} />
+        )}
       </TouchableOpacity>
 
       <View
@@ -114,6 +144,7 @@ const MessageInput = ({ onSend, onTyping, onStopTyping }) => {
           value={message}
           onChangeText={handleChangeText}
           onContentSizeChange={handleContentSizeChange}
+          onFocus={() => setIsEmojiPickerOpen(false)}
           multiline
           maxLength={5000}
           textAlignVertical="center"
@@ -134,6 +165,25 @@ const MessageInput = ({ onSend, onTyping, onStopTyping }) => {
       >
         <SendHorizontal size={20} color="#FFFFFF" />
       </TouchableOpacity>
+
+      <EmojiPicker
+        onEmojiSelected={handleEmojiSelected}
+        open={isEmojiPickerOpen}
+        onClose={() => setIsEmojiPickerOpen(false)}
+        theme={{
+          backdrop: '#00000055',
+          knob: colors.border,
+          container: colors.card,
+          header: colors.text,
+          skinTonesContainer: colors.card,
+          category: {
+            icon: colors.textSecondary,
+            iconActive: colors.primary,
+            container: colors.card,
+            containerActive: colors.borderLight,
+          },
+        }}
+      />
     </View>
   );
 };

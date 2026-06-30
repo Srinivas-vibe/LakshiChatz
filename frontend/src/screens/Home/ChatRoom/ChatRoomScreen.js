@@ -79,7 +79,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
           setChatId(chat._id);
         }
       } catch (error) {
-        console.error('Failed to init chat:', error);
+        console.warn('Failed to init chat:', error);
       }
     };
     initChat();

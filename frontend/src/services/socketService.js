@@ -40,7 +40,7 @@ class SocketService {
       reconnectionDelay: 1000,
       reconnectionDelayMax: 10000,
       randomizationFactor: 0.5,
-      timeout: 20000,
+      timeout: 60000, // Increased to 60s for Render cold start
     });
 
     // Connection events
@@ -55,7 +55,7 @@ class SocketService {
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error.message);
+      console.warn('Socket connection error:', error.message);
       callbacks.onError?.(error);
     });
 
@@ -105,7 +105,7 @@ class SocketService {
 
     // Error events
     this.socket.on(SOCKET_EVENTS.ERROR, (data) => {
-      console.error('Socket error event:', data);
+      console.warn('Socket error event:', data);
       callbacks.onError?.(data);
     });
   }

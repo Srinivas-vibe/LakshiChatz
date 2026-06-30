@@ -105,12 +105,14 @@ const useSocket = () => {
         },
 
         onMessageStatusUpdate: (data) => {
-          const { chatId, status } = data;
+          const { chatId, status, userId } = data;
 
           // Find the chat partner to update their messages
-          if (activeChatUserIdRef.current) {
+          const partnerId = userId || activeChatUserIdRef.current;
+
+          if (partnerId) {
             updateMessageStatus(
-              activeChatUserIdRef.current,
+              partnerId,
               chatId,
               status,
               {
