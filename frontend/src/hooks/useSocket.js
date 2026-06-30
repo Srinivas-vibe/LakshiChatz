@@ -16,6 +16,7 @@ const useSocket = () => {
   const { token, isAuthenticated, user } = useAuthStore();
   const { connect, disconnect } = useSocketStore();
   const addMessage = useChatStore((s) => s.addMessage);
+  const resolveOptimisticMessage = useChatStore((s) => s.resolveOptimisticMessage);
   const updateMessageStatus = useChatStore((s) => s.updateMessageStatus);
   const updateChatListItem = useChatStore((s) => s.updateChatListItem);
   const editMessageInStore = useChatStore((s) => s.editMessageInStore);
@@ -31,7 +32,7 @@ const useSocket = () => {
     if (isAuthenticated && token) {
       connect(token, {
         onNewMessage: async (data) => {
-          const { message } = data;
+          const { message, localId } = data;
           if (!message || !user) {
             return;
           }
@@ -83,20 +84,32 @@ const useSocket = () => {
             }
           }
 
-          // Add message to Zustand state
-          addMessage(chatPartnerId, message);
-
-          // Update chat list
           const isFromMe = senderId === user._id;
-          updateChatListItem(
-            chatPartnerId,
-            {
+
+          if (isFromMe && localId) {
+            // Resolve optimistic message
+            await resolveOptimisticMessage(chatPartnerId, localId, message);
+            
+            updateChatListItem(chatPartnerId, {
               text: message.message,
               sender: message.sender,
               sentAt: message.sentAt,
-            },
-            isFromMe ? 0 : 1,
-          );
+            }, 0);
+          } else {
+            // Add message to Zustand state
+            addMessage(chatPartnerId, message);
+
+            // Update chat list
+            updateChatListItem(
+              chatPartnerId,
+              {
+                text: message.message,
+                sender: message.sender,
+                sentAt: message.sentAt,
+              },
+              isFromMe ? 0 : 1,
+            );
+          }
 
           // ACK to server: "I have saved this message locally, you can delete it from MongoDB"
           socketService.emit('messageReceived', {

@@ -22,6 +22,8 @@ const ChatBubble = ({ message, isMine, showTimestamp = true, onLongPress }) => {
     }
 
     switch (message.status) {
+      case 'sending':
+        return <Text style={[styles.statusIcon, { color: colors.textTertiary, fontSize: 10, marginRight: 2 }]}>🕒</Text>;
       case MESSAGE_STATUS.SENT:
         return <Text style={[styles.statusIcon, { color: colors.statusSent }]}>✓</Text>;
       case MESSAGE_STATUS.DELIVERED:

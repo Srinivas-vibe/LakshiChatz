@@ -127,12 +127,12 @@ class SocketService {
    * @param {string} receiverId - The receiver's user ID.
    * @param {string} message - The message content.
    */
-  sendMessage(receiverId, message) {
+  sendMessage(receiverId, message, localId = null) {
     if (!this.socket?.connected) {
-      console.error('Socket not connected. Cannot send message.');
+      console.warn('Socket not connected. Cannot send message.');
       return false;
     }
-    this.socket.emit(SOCKET_EVENTS.MESSAGE, { receiverId, message });
+    this.socket.emit(SOCKET_EVENTS.MESSAGE, { receiverId, message, localId });
     return true;
   }
 

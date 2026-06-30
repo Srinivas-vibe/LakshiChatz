@@ -16,7 +16,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
    */
   socket.on(SOCKET_EVENTS.MESSAGE, async (data) => {
     try {
-      const { receiverId, message } = data;
+      const { receiverId, message, localId } = data;
       const senderId = socket.userId;
 
       if (!receiverId || !message || !message.trim()) {
@@ -42,6 +42,7 @@ const registerMessageHandlers = (io, socket, connectedUsers) => {
       socket.emit(SOCKET_EVENTS.NEW_MESSAGE, {
         message: result.message,
         chatId: result.chat._id,
+        localId,
       });
 
       // Emit to receiver if online

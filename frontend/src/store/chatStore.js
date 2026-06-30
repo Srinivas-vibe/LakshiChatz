@@ -166,6 +166,52 @@ const useChatStore = create((set, get) => ({
   },
 
   /**
+   * Add a temporary message to the store for optimistic UI.
+   * Does NOT persist to local SQLite until resolved.
+   */
+  addOptimisticMessage: (userId, message) => {
+    const currentMessages = get().messages[userId] || [];
+    set({
+      messages: {
+        ...get().messages,
+        [userId]: [...currentMessages, message],
+      },
+    });
+    
+    // Update chat list preview immediately
+    get().updateChatListItem(userId, {
+      text: message.message,
+      sender: message.sender,
+      sentAt: message.sentAt,
+    });
+  },
+
+  /**
+   * Resolve an optimistic message with the real message from the server.
+   * Replaces the local temporary message and persists to SQLite.
+   */
+  resolveOptimisticMessage: async (userId, localId, realMessage) => {
+    const currentMessages = get().messages[userId] || [];
+    const updatedMessages = currentMessages.map((msg) =>
+      msg._id === localId ? realMessage : msg
+    );
+    
+    set({
+      messages: {
+        ...get().messages,
+        [userId]: updatedMessages,
+      },
+    });
+
+    // Persist real message to local SQLite
+    try {
+      await messageDb.saveMessage(realMessage, userId);
+    } catch (error) {
+      console.error('Failed to save real message to local DB:', error.message);
+    }
+  },
+
+  /**
    * Update message status (sent → delivered → read).
    * Also updates the local SQLite database.
    * @param {string} userId - The chat partner's ID.

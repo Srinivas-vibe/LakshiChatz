@@ -49,6 +49,7 @@ const ChatRoomScreen = ({ route, navigation }) => {
     setActiveChatUserId,
     editMessageInStore,
     deleteMessageInStore,
+    addOptimisticMessage,
   } = useChatStore();
   const { isUserOnline, isUserTyping, emitTyping, emitStopTyping, emitSeen } =
     useSocketStore();
@@ -106,9 +107,22 @@ const ChatRoomScreen = ({ route, navigation }) => {
 
   const handleSend = useCallback(
     (text) => {
-      socketService.sendMessage(userId, text);
+      const localId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      const optimisticMessage = {
+        _id: localId,
+        message: text,
+        sender: currentUser._id,
+        receiver: userId,
+        status: 'sending',
+        sentAt: new Date().toISOString(),
+        isOptimistic: true,
+      };
+
+      addOptimisticMessage(userId, optimisticMessage);
+      socketService.sendMessage(userId, text, localId);
     },
-    [userId],
+    [userId, currentUser, addOptimisticMessage],
   );
 
   const handleTyping = useCallback(() => {
